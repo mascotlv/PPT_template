@@ -1,0 +1,16 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/_global-error/page": "/_global-error",
+  "/robots.txt/route": "/robots.txt",
+  "/sitemap.xml/route": "/sitemap.xml",
+  "/account/page": "/account",
+  "/admin/page": "/admin",
+  "/checkout/[slug]/page": "/checkout/[slug]",
+  "/contact/page": "/contact",
+  "/orders/[id]/page": "/orders/[id]",
+  "/page": "/",
+  "/policies/[type]/page": "/policies/[type]",
+  "/products/[slug]/page": "/products/[slug]",
+  "/products/page": "/products",
+  "/recover/page": "/recover"
+}

@@ -1,0 +1,2 @@
+import {restore} from './backup-lib.mjs';
+restore(process.env.RESTORE_DATABASE_URL,process.env.RESTORE_STORAGE_ROOT,process.env.BACKUP_DIRECTORY,process.env.BACKUP_KEY).then(r=>console.log(`Restored isolated database and ${r.files} verified files. Restore configuration encryption key from protected backup before use.`)).catch(()=>{console.error('Restore failed: target must be isolated, migrated and empty; no existing data is overwritten.');process.exitCode=1;});

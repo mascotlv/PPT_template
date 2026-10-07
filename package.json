@@ -1,0 +1,58 @@
+{
+  "name": "template-workshop",
+  "private": true,
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "cleanup": "node scripts/cleanup.mjs --apply",
+    "cleanup:preview": "node scripts/cleanup.mjs",
+    "dev": "node scripts/run.mjs dev",
+    "start": "node scripts/run.mjs start",
+    "build": "node scripts/pnpm.mjs --filter backend generate && node scripts/pnpm.mjs --filter backend build && node scripts/pnpm.mjs --filter frontend build",
+    "typecheck": "node scripts/pnpm.mjs --filter backend typecheck && node scripts/pnpm.mjs --filter frontend typecheck",
+    "lint": "eslint frontend/src backend/src --ignore-pattern backend/src/generated",
+    "test": "node scripts/pnpm.mjs --filter backend test",
+    "test:integration": "node scripts/integration.mjs",
+    "test:maintenance": "node scripts/test-admin-maintenance.mjs",
+    "test:e2e": "node scripts/e2e.mjs",
+    "smoke:local": "node scripts/smoke-local.mjs",
+    "verify": "node scripts/pnpm.mjs build && node scripts/pnpm.mjs typecheck && node scripts/pnpm.mjs lint && node scripts/pnpm.mjs test && node scripts/pnpm.mjs test:integration && node scripts/pnpm.mjs test:e2e",
+    "setup:local": "node scripts/setup-local.mjs",
+    "db:local": "node scripts/postgres.mjs",
+    "db:migrate": "node scripts/pnpm.mjs --filter backend migrate",
+    "seed": "node scripts/pnpm.mjs --filter backend seed",
+    "admin:init": "node scripts/pnpm.mjs --filter backend admin:init",
+    "admin:code": "node scripts/admin-code.mjs",
+    "admin:qr": "node scripts/admin-qr.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs",
+    "upgrade:commerce": "node scripts/pnpm.mjs --filter backend commerce:upgrade",
+    "files:normalize": "node scripts/pnpm.mjs --filter backend files:normalize",
+    "start:local": "node scripts/local-start.mjs",
+    "doctor:local": "node scripts/doctor-local.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "embedded-postgres": "18.4.0-beta.17",
+    "eslint": "10.12.0",
+    "typescript-eslint": "8.71.1",
+    "pg": "8.20.0",
+    "dotenv": "17.3.1",
+    "http-proxy": "1.18.1",
+    "qrcode": "1.5.4",
+    "yaml": "2.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "path-to-regexp": "8.4.2",
+      "lodash": "4.18.1",
+      "js-yaml": "4.3.2",
+      "deepmerge-ts": "8.0.2",
+      "mysql2": "3.24.5",
+      "image-size": "2.0.4"
+    }
+  }
+}

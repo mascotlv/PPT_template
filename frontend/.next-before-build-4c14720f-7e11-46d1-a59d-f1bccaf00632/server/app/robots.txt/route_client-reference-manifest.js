@@ -1,0 +1,1 @@
+globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});globalThis.__RSC_MANIFEST["/robots.txt/route"]={"moduleLoading":{"prefix":"/_next/"},"ssrModuleMapping":{},"edgeSSRModuleMapping":{},"clientModules":{},"entryCSSFiles":{"C:\\Users\\liwei\\Desktop\\店铺\\网站代码\\frontend\\src\\app\\robots.txt\\route":[]},"rscModuleMapping":{},"edgeRscModuleMapping":{}};

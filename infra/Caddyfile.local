@@ -1,0 +1,19 @@
+:80 {
+    @limitedBody not path /api/v1/admin/products/*/current-file
+    request_body @limitedBody {
+        max_size 21MB
+    }
+    @api path /api/*
+    handle @api {
+        reverse_proxy backend:4100
+    }
+    handle {
+        reverse_proxy frontend:3000
+    }
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        X-Robots-Tag "noindex, nofollow"
+    }
+}

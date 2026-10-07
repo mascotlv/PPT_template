@@ -1,0 +1,6 @@
+export type Currency='CNY'|'USD'|'EUR'|'JPY'|'KRW'|'GBP'|'CAD'|'AUD'|'CHF'|'HKD'|'SGD'|'NZD'|'TWD'|'BRL'|'MXN'|'INR'|'AED'|'SAR'|'RUB'|'SEK'|'NOK'|'DKK'|'PLN'|'THB'|'IDR'|'MYR'|'PHP'|'ZAR'|'TRY';
+export type Language='zh'|'zh-TW'|'en'|'ja'|'ko'|'fr'|'de'|'es'|'pt'|'ru'|'ar'|'hi'|'it';
+export interface PricingSnapshot {base:'CNY';baseAmount:number;source:string;rate:string;asOf:string;fxId:string;}
+export interface Quote {productId:string;currency:Currency;amount:number;fileVersionId:string;termsVersion:string;expiresAt:string;checkoutEnabled:boolean;quoteToken:string;pricing:PricingSnapshot|{mode:'legacy'};}
+export interface CustomerView {id:string;email:string;name:string;country:string;language:Language;currency:Currency;verified:boolean;}
+export interface OrderView {id:string;number:string;email:string;language:Language;currency:Currency;amount:number;status:'AWAITING_PAYMENT'|'PAID'|'CLOSED';deliveryStatus:'PENDING'|'READY'|'FAILED';isTest:boolean;entitlement?:'ACTIVE'|'SUSPENDED'|'REVOKED';payments:{id:string;provider:string;status:string}[];refunds:{id:string;status:string;reason:string;amount:number}[];item:{snapshot:{titleZh:string;titleEn:string;version:string};filename:string;version:string};tickets:{id:string;content:string;reply?:string;status:string}[];createdAt:string;}

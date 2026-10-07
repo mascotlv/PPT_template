@@ -1,0 +1,375 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+datasource db {
+  provider = "postgresql"
+}
+model Category {
+  id String @id
+  nameZh String
+  nameEn String
+  translations Json @default("{}")
+  archived Boolean @default(false)
+  products Product[]
+}
+model Product {
+  id String @id @default(uuid())
+  slug String @unique
+  titleZh String
+  titleEn String
+  descriptionZh String
+  descriptionEn String
+  categoryId String
+  category Category @relation(fields:[categoryId], references:[id])
+  status String @default("DRAFT")
+  sort Int @default(0)
+  metadata Json
+  translations Json @default("{}")
+  deletedAt DateTime?
+  isDemo Boolean @default(true)
+  prices Price[]
+  versions FileVersion[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status,categoryId,sort])
+}
+model Price {
+  id String @id @default(uuid())
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  currency String
+  amount Int
+  active Boolean @default(true)
+  @@unique([productId,currency])
+}
+model FileVersion {
+  id String @id @default(uuid())
+  productId String
+  product Product @relation(fields:[productId],references:[id])
+  version String
+  key String @unique
+  filename String
+  size Int
+  sha256 String
+  format String @default("pptx")
+  licenseVersion String @default("demo-v1")
+  previews Json
+  createdAt DateTime @default(now())
+  orderItems OrderItem[]
+  entitlements Entitlement[]
+  @@unique([productId,version])
+}
+model Session {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  csrfHash String
+  kind String
+  customerId String?
+  customer Customer? @relation(fields:[customerId],references:[id])
+  adminId String?
+  admin Admin? @relation(fields:[adminId],references:[id])
+  verifiedEmail String?
+  expiresAt DateTime
+  revokedAt DateTime?
+  reauthAt DateTime?
+  createdAt DateTime @default(now())
+  orders Order[]
+}
+model Order {
+  id String @id @default(uuid())
+  number String @unique
+  sessionId String
+  session Session @relation(fields:[sessionId],references:[id])
+  email String
+  customerId String?
+  customer Customer? @relation(fields:[customerId],references:[id])
+  country String?
+  pricingSnapshot Json @default("{}")
+  language String
+  currency String
+  amount Int
+  status String @default("AWAITING_PAYMENT")
+  deliveryStatus String @default("PENDING")
+  isTest Boolean
+  idempotencyKey String
+  requestHash String
+  source String?
+  termsVersion String
+  expiresAt DateTime
+  paidPaymentId String? @unique
+  item OrderItem?
+  payments Payment[]
+  refunds Refund[]
+  tickets SupportTicket[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([sessionId,idempotencyKey])
+  @@index([email,createdAt])
+  @@index([status,expiresAt])
+}
+model OrderItem {
+  id String @id @default(uuid())
+  orderId String @unique
+  order Order @relation(fields:[orderId],references:[id])
+  fileVersionId String
+  fileVersion FileVersion @relation(fields:[fileVersionId],references:[id])
+  snapshot Json
+  entitlement Entitlement?
+}
+model Payment {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields:[orderId],references:[id])
+  provider String
+  merchant String
+  channelOrderId String @unique
+  transactionId String? @unique
+  amount Int
+  currency String
+  status String @default("CREATED")
+  idempotencyKey String
+  channel MockPayment?
+  queriedAt DateTime?
+  events PaymentEvent[]
+  refunds Refund[]
+  createdAt DateTime @default(now())
+  @@unique([orderId,idempotencyKey])
+  @@index([status,createdAt])
+  @@index([status,queriedAt])
+}
+model MockPayment {
+  id String @id @default(uuid())
+  paymentId String @unique
+  payment Payment @relation(fields:[paymentId],references:[id])
+  transactionId String @unique
+  status String @default("PENDING")
+  settleAt DateTime?
+}
+model PaymentEvent {
+  id String @id @default(uuid())
+  eventKey String @unique
+  provider String
+  paymentId String?
+  payment Payment? @relation(fields:[paymentId],references:[id])
+  payload Json
+  status String @default("RECEIVED")
+  error String?
+  receivedAt DateTime @default(now())
+  processedAt DateTime?
+}
+model Entitlement {
+  id String @id @default(uuid())
+  orderItemId String @unique
+  orderItem OrderItem @relation(fields:[orderItemId],references:[id])
+  fileVersionId String
+  fileVersion FileVersion @relation(fields:[fileVersionId],references:[id])
+  status String @default("ACTIVE")
+  revokedAt DateTime?
+  logs DownloadLog[]
+  tokens DownloadToken[]
+}
+model DownloadToken {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  entitlementId String
+  entitlement Entitlement @relation(fields:[entitlementId],references:[id])
+  sessionId String
+  expiresAt DateTime
+  revokedAt DateTime?
+}
+model DownloadLog {
+  id String @id @default(uuid())
+  entitlementId String
+  entitlement Entitlement @relation(fields:[entitlementId],references:[id])
+  status String
+  bytes Int @default(0)
+  createdAt DateTime @default(now())
+}
+model RecoveryToken {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  email String
+  expiresAt DateTime
+  consumedAt DateTime?
+}
+model Refund {
+  id String @id @default(uuid())
+  orderId String
+  order Order @relation(fields:[orderId],references:[id])
+  paymentId String
+  payment Payment @relation(fields:[paymentId],references:[id])
+  amount Int
+  currency String
+  reason String
+  status String @default("REQUESTED")
+  reviewerId String?
+  reviewReason String?
+  idempotencyKey String @unique
+  channelRefundId String? @unique
+  scenario String @default("success")
+  channelStatus String?
+  settleAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status,updatedAt])
+}
+model Admin {
+  id String @id @default(uuid())
+  email String @unique
+  passwordHash String
+  role String
+  totpEncrypted String
+  recoveryHashes Json
+  sessions Session[]
+  disabled Boolean @default(false)
+  createdAt DateTime @default(now())
+}
+model SupportTicket {
+  id String @id @default(uuid())
+  orderId String?
+  order Order? @relation(fields:[orderId],references:[id])
+  title String?
+  source String @default("CUSTOMER")
+  content String
+  reply String?
+  handlerId String?
+  status String @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  @@index([status,createdAt])
+}
+model Audit {
+  id String @id @default(uuid())
+  actorId String
+  action String
+  objectId String
+  summary Json
+  requestId String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+model Job {
+  id String @id @default(uuid())
+  kind String
+  relatedId String
+  idempotencyKey String @unique
+  payload Json
+  status String @default("PENDING")
+  attempts Int @default(0)
+  runAt DateTime @default(now())
+  leaseUntil DateTime?
+  error String?
+  createdAt DateTime @default(now())
+  @@index([status,runAt])
+}
+model MailMessage {
+  id String @id @default(uuid())
+  jobId String @unique
+  recipient String
+  subject String
+  html String
+  status String
+  createdAt DateTime @default(now())
+}
+model Setting {
+  key String @id
+  value Json
+  updatedAt DateTime @updatedAt
+}
+model RateLimit {
+  key String @id
+  count Int
+  resetAt DateTime
+}
+
+model Customer {
+  id String @id @default(uuid())
+  email String @unique
+  name String
+  country String
+  language String
+  currency String
+  passwordHash String
+  emailVerifiedAt DateTime?
+  disabled Boolean @default(false)
+  sessions Session[]
+  orders Order[]
+  tokens CustomerToken[]
+  conversation ChatConversation?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([country,createdAt])
+}
+model ChatConversation {
+  id String @id @default(uuid())
+  customerId String @unique
+  customer Customer @relation(fields:[customerId],references:[id])
+  status String @default("OPEN")
+  buyerSeenAt DateTime @default(now())
+  sellerSeenAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  messages ChatMessage[]
+  @@index([updatedAt])
+}
+model ChatMessage {
+  id String @id @default(uuid())
+  conversationId String
+  conversation ChatConversation @relation(fields:[conversationId],references:[id])
+  sender String
+  actorId String
+  content String @default("")
+  clientId String
+  attachment ChatAttachment?
+  createdAt DateTime @default(now())
+  @@unique([conversationId,clientId])
+  @@index([conversationId,createdAt,id])
+}
+model ChatAttachment {
+  id String @id @default(uuid())
+  messageId String @unique
+  message ChatMessage @relation(fields:[messageId],references:[id],onDelete:Cascade)
+  key String
+  filename String
+  mimetype String
+  size Int
+  sha256 String
+  kind String @default("FILE")
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+model CustomerToken {
+  id String @id @default(uuid())
+  customerId String
+  customer Customer @relation(fields:[customerId],references:[id])
+  kind String
+  tokenHash String @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+}
+model FxSnapshot {
+  id String @id @default(uuid())
+  source String
+  base String
+  rates Json
+  fetchedAt DateTime @default(now())
+  @@index([fetchedAt])
+}
+model AnalyticsEvent {
+  id String @id @default(uuid())
+  sessionId String
+  customerId String?
+  productId String?
+  country String?
+  kind String
+  day String
+  dedupKey String @unique
+  isTest Boolean
+  createdAt DateTime @default(now())
+  @@index([createdAt,kind])
+  @@index([productId,createdAt])
+  @@index([country,createdAt])
+}

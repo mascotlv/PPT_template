@@ -1,0 +1,147 @@
+name: workshop-staging
+services:
+  db:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_USER: workshop
+      POSTGRES_DB: workshop
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Set isolated database password}
+    volumes:
+      - database:/var/lib/postgresql
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U workshop -d workshop
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+  mailpit:
+    image: axllent/mailpit:v1.29.3
+    networks:
+      - internal
+    restart: unless-stopped
+    mem_limit: 128m
+  migrate:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+      target: migrate
+    env_file: .env.staging
+    networks:
+      - internal
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: no
+  backend:
+    image: workshop-backend:staging
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    env_file: .env.staging
+    environment:
+      APP_ENV: staging
+      PAYMENT_MODE: mock
+      NODE_ENV: production
+      PORT: 4100
+      STORAGE_ROOT: /data/files
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_TRANSPORT: smtp
+    volumes:
+      - private_files:/data/files
+      - admin_setup:/app/.runtime
+    networks:
+      - internal
+    restart: unless-stopped
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+  worker:
+    image: workshop-backend:staging
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    env_file: .env.staging
+    environment:
+      APP_ENV: staging
+      PAYMENT_MODE: mock
+      NODE_ENV: production
+      PORT: 4100
+      STORAGE_ROOT: /data/files
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      MAIL_TRANSPORT: smtp
+    volumes:
+      - private_files:/data/files
+      - admin_setup:/app/.runtime
+    networks:
+      - internal
+    restart: unless-stopped
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+    command:
+      - node
+      - dist/worker.js
+    healthcheck:
+      disable: true
+    depends_on:
+      backend:
+        condition: service_healthy
+  frontend:
+    image: workshop-frontend:staging
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    environment:
+      BACKEND_URL: http://backend:4100
+      PUBLIC_ORIGIN: https://${DOMAIN}
+    networks:
+      - internal
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 512m
+    restart: unless-stopped
+  proxy:
+    image: caddy:2.11.2-alpine
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+    depends_on:
+      frontend:
+        condition: service_healthy
+    mem_limit: 128m
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?Set actual isolated domain}
+networks:
+  internal: {}
+volumes:
+  database: {}
+  private_files: {}
+  admin_setup: {}
+  caddy_data: {}
+  caddy_config: {}

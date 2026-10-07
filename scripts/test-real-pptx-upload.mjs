@@ -1,0 +1,78 @@
+// Read the supplied deck without modifying it; upload only to an isolated product.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { chromium } from '@playwright/test';
+import { fixture } from './fixture.mjs';
+import { root, command, until } from './common.mjs';
+const require = createRequire(import.meta.url);
+const { createApp } = require('../backend/dist/app');
+const { LocalStorage } = require('../backend/dist/storage/local');
+const OTPAuth = require('../backend/node_modules/otpauth');
+const t = require('../backend/dist/commerce/dictionaries').dictionaries.zh;
+const origin = 'http://localhost:3001';
+const input = process.argv[2];
+if (!input) throw new Error('Usage: node scripts/test-real-pptx-upload.mjs <deck.pptx>');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+let f, server, frontend, browser;
+const report = { status: 'FAIL', scope: 'Actual deck through browser and Next API proxy; isolated database/storage' };
+try {
+    console.log('Reading actual deck');
+    const bytes = await fs.readFile(input), beforeHash = hash(bytes);
+    report.uploadBytes = bytes.length;
+    f = await fixture('integration', 55433);
+    f.config.PUBLIC_ORIGIN = origin; f.config.STORE_ACCESS_MODE = 'account';
+    server = await createApp(f.config); await server.app.listen(4100, '127.0.0.1');
+    frontend = command(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', '3001'], { cwd: path.join(root, 'frontend') });
+    await until('http://127.0.0.1:3001');
+    console.log('Isolated servers ready');
+    const product = await f.db.product.findFirstOrThrow({ orderBy: { sort: 'asc' } });
+    browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+    const page = await browser.newPage(); page.setDefaultTimeout(30000);
+    page.on('requestfailed', request => { if (request.url().endsWith('/current-file')) report.requestFailure = request.failure()?.errorText; });
+    await page.goto(origin + '/admin');
+    await page.getByLabel(t.email).fill(f.admin.email);
+    await page.getByLabel(t.password, { exact: true }).fill(f.admin.password);
+    const otp = () => new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(f.admin.secret) }).generate();
+    await page.getByLabel(t.code).fill(otp());
+    await page.locator('form').getByRole('button', { name: new RegExp(t.login) }).click();
+    await page.locator('.admin-sidebar').waitFor();
+    await page.locator('.admin-sidebar').getByRole('button', { name: t.productsAdmin || t.products, exact: true }).click();
+    await page.locator('.admin-product-list article').filter({ hasText: product.titleZh }).getByRole('button', { name: t.edit, exact: true }).click();
+    await page.locator('.editor select').filter({ has: page.locator('option[value="original"]') }).selectOption('original');
+    console.log('Logged in without reauthentication; uploading actual deck');
+    const start = Date.now();
+    const response = page.waitForResponse(r => r.url().endsWith('/current-file') && r.request().method() === 'POST', { timeout: 360000 }).catch(() => null);
+    await page.locator('.editor input[type=file]').setInputFiles(input);
+    const result = await response;
+    console.log('Upload response', result?.status());
+    report.elapsedSeconds = (Date.now() - start) / 1000;
+    report.httpStatus = result?.status();
+    const payload = await result?.json();
+    assert.equal(result?.status(), 201, JSON.stringify(payload || report.requestFailure));
+    report.previewCount = payload.previewCount;
+    const sessions = await f.db.session.findMany({ where: { kind: 'ADMIN', revokedAt: null } });
+    assert.ok(sessions.length && sessions.every(session => session.reauthAt === null));
+    report.noReauthentication = true;
+    // Previews below the viewport are intentionally lazy-loaded in the editor.
+    await page.waitForFunction(count => document.querySelectorAll('.editor .admin-product-cover img').length === count, payload.previewCount);
+    await page.locator('.editor .admin-product-cover img').evaluateAll(images => images.forEach(image => { image.loading = 'eager'; }));
+    await page.waitForFunction(count => { const images = [...document.querySelectorAll('.editor .admin-product-cover img')]; return images.length === count && images.every(i => i.complete && i.naturalWidth > 0); }, payload.previewCount);
+    const version = await f.db.fileVersion.findFirstOrThrow({ where: { productId: product.id }, orderBy: { createdAt: 'desc' } });
+    assert.ok(version.previews.length > 0);
+    assert.ok(version.previews.every(key => key.endsWith('.png')));
+    assert.equal(version.previews.length, payload.previewCount);
+    const storage = new LocalStorage(f.config.STORAGE_ROOT, f.config.PURCHASE_ROOT);
+    assert.equal(hash(await fs.readFile(storage.resolve(version.key))), beforeHash, 'Stored original must preserve embedded music and all original bytes');
+    assert.equal(hash(await fs.readFile(input)), beforeHash, 'Source deck must remain unchanged');
+    report.status = 'PASS';
+} catch (error) { report.error = error.message; console.log('FAIL', error.message); process.exitCode = 1; }
+finally {
+    await fs.mkdir(path.join(root, 'docs/evidence'), { recursive: true });
+    await fs.writeFile(path.join(root, 'docs/evidence/real-pptx-upload.json'), JSON.stringify(report, null, 2));
+    console.log(JSON.stringify(report, null, 2));
+    await browser?.close(); frontend?.kill(); server?.app.getHttpServer().closeAllConnections();
+    await server?.app.close(); await server?.db.$disconnect(); await f?.stop();
+}

@@ -1,0 +1,62 @@
+name: workshop-local
+x-backend: &backend
+  image: workshop-backend:local
+  build: {context: .., dockerfile: backend/Dockerfile}
+  env_file: .env.local
+  environment: {APP_ENV: local, PAYMENT_MODE: mock, NODE_ENV: production, PORT: 4100, STORAGE_ROOT: /data/files, SMTP_HOST: mailpit, SMTP_PORT: 1025, MAIL_TRANSPORT: smtp}
+  volumes: [private_files:/data/files, admin_setup:/app/.runtime]
+  networks: [internal]
+  restart: unless-stopped
+  mem_limit: 768m
+  logging: {driver: json-file, options: {max-size: 10m, max-file: "3"}}
+services:
+  db:
+    image: postgres:18.4-bookworm
+    environment: {POSTGRES_USER: workshop, POSTGRES_DB: workshop, POSTGRES_PASSWORD: '${DATABASE_PASSWORD:?Set isolated database password}'}
+    volumes: [database:/var/lib/postgresql]
+    networks: [internal]
+    healthcheck: {test: [CMD-SHELL, pg_isready -U workshop -d workshop], interval: 5s, timeout: 3s, retries: 20}
+    mem_limit: 512m
+    restart: unless-stopped
+  mailpit:
+    image: axllent/mailpit:v1.29.3
+    ports: ["127.0.0.1:8025:8025"]
+    networks: [internal]
+    restart: unless-stopped
+    mem_limit: 128m
+  migrate:
+    build: {context: .., dockerfile: backend/Dockerfile, target: migrate}
+    env_file: .env.local
+    networks: [internal]
+    depends_on: {db: {condition: service_healthy}}
+    restart: "no"
+  backend:
+    <<: *backend
+    depends_on: {migrate: {condition: service_completed_successfully}, mailpit: {condition: service_started}}
+  worker:
+    <<: *backend
+    command: [node, dist/worker.js]
+    healthcheck: {disable: true}
+    depends_on: {backend: {condition: service_healthy}}
+  frontend:
+    image: workshop-frontend:local
+    build: {context: .., dockerfile: frontend/Dockerfile}
+    environment: {BACKEND_URL: 'http://backend:4100', PUBLIC_ORIGIN: 'http://localhost:8080'}
+    networks: [internal]
+    depends_on: {backend: {condition: service_healthy}}
+    mem_limit: 512m
+    restart: unless-stopped
+  proxy:
+    image: caddy:2.11.2-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes: ["./Caddyfile.local:/etc/caddy/Caddyfile:ro"]
+    networks: [internal]
+    depends_on: {frontend: {condition: service_healthy}}
+    mem_limit: 128m
+    restart: unless-stopped
+networks:
+  internal: {}
+volumes:
+  database: {}
+  private_files: {}
+  admin_setup: {}

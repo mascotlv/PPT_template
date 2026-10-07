@@ -1,0 +1,12 @@
+packages:
+  - frontend
+  - backend
+  - packages/*
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/engines'
+  - prisma
+  - embedded-postgres
+  - '@embedded-postgres/windows-x64'
+  - esbuild
+  - sharp

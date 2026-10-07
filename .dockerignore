@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+.runtime
+.cache
+**/.env
+**/.env.*
+**/dist
+**/.next
+backend/src/generated
+docs/evidence
+test-results
+.git
+购买文件
+backups
+playwright-report
+**/*.tsbuildinfo
