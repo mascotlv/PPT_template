@@ -7,6 +7,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "build:preview": "node scripts/build-preview.mjs",
     "cleanup": "node scripts/cleanup.mjs --apply",
     "cleanup:preview": "node scripts/cleanup.mjs",
     "dev": "node scripts/run.mjs dev",

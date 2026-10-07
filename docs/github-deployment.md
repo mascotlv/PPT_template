@@ -1,6 +1,8 @@
 # GitHub 上传与网站上线
 
-本项目包含 Next.js、Node.js API、后台 worker、PostgreSQL 和持久文件存储。GitHub 用于保存代码；GitHub Pages 仅提供静态托管，无法运行本项目完整功能。
+本次只部署可浏览的前端展示版，使用 GitHub Pages，无需服务器。构建、发布和更新方式见 [前端展示版说明](frontend-preview.md)。
+
+以下为完整商城部署的参考说明：完整项目包含 Next.js、Node.js API、后台 worker、PostgreSQL 和持久文件存储，GitHub Pages 无法运行完整业务功能。
 
 ## 上传代码
 
