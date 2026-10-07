@@ -86,4 +86,23 @@ await new Promise((resolve,reject)=>{
  child.on('error',reject);child.on('exit',code=>code===0?resolve():reject(Error('Preview build failed: '+code)));
 });
 await fs.writeFile(path.join(source,'out/.nojekyll'),'');
+// Windows Next exports segment files into nested folders; browsers request dotted names.
+// Add the portable aliases so the same exported artifact works on a plain static host.
+async function portableSegments(directory) {
+ for(const entry of await fs.readdir(directory,{withFileTypes:true})) {
+  if(!entry.isDirectory()) continue;
+  const location=path.join(directory,entry.name);
+  if(entry.name.startsWith('__next.')) {
+   async function flatten(folder,parts) {
+    for(const item of await fs.readdir(folder,{withFileTypes:true})) {
+     const next=path.join(folder,item.name);
+     if(item.isDirectory()) await flatten(next,[...parts,item.name]);
+     else await fs.copyFile(next,path.join(directory,[...parts,item.name].join('.')));
+    }
+   }
+   await flatten(location,[entry.name]);
+  } else await portableSegments(location);
+ }
+}
+await portableSegments(path.join(source,'out'));
 console.log('Static preview ready: '+path.join(source,'out'));
